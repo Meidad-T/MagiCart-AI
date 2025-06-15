@@ -111,9 +111,9 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
 
   const healthScore = calculateCartHealthScore();
 
-  // Trigger confetti when health score reaches 100
+  // Trigger confetti when health score reaches excellent (85+)
   useEffect(() => {
-    if (healthScore === 100 && previousHealthScore !== 100) {
+    if (healthScore >= 85 && previousHealthScore < 85) {
       setConfettiTrigger(true);
       // Reset the trigger after a short delay
       setTimeout(() => setConfettiTrigger(false), 100);
@@ -123,7 +123,7 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
 
   // Auto-collapse when cart items reduce below the expand threshold
   useEffect(() => {
-    if (cart.length <= 4 && cartExpanded) {
+    if (cart.length <= 3 && cartExpanded) {
       setCartExpanded(false);
     }
   }, [cart.length, cartExpanded]);
@@ -187,7 +187,7 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
             storeFee = subtotal >= 50 ? 0 : 4.99;
             break;
           case 'heb':
-            storeFee = 0; // Free pickup
+            storeFee = 0; // Free curbside pickup
             break;
           // Aldi, Target, Kroger have no pickup fees mentioned
         }
@@ -263,10 +263,10 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
     'Aldi': '#ff6900'
   };
 
-  // Fixed logic: Always show max 4 items when collapsed, regardless of total count
-  const shouldShowExpandButton = cart.length > 4;
-  const itemsToShow = cartExpanded ? cart : cart.slice(0, 4);
-  const hiddenItemsCount = cart.length - 4;
+  // Fixed logic: Always show max 3 items when collapsed, regardless of total count
+  const shouldShowExpandButton = cart.length > 3;
+  const itemsToShow = cartExpanded ? cart : cart.slice(0, 3);
+  const hiddenItemsCount = cart.length - 3;
 
   if (cart.length === 0) {
     return (
@@ -338,26 +338,13 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
                 <div className="flex justify-between items-start">
                   <div className="flex-1 pr-4">
                     <CardTitle>Cart Items ({cart.length})</CardTitle>
-                    {/* Health Score Tip - with improved wrapping and more spacing below */}
+                    {/* Health Score Tip - with proper wrapping and moved down */}
                     {cart.length > 0 && (
-                      <p className="text-xs text-gray-400 mt-8 max-w-xs"
-                        style={{ wordBreak: "break-word" }}
-                      >
+                      <p className="text-xs text-gray-400 mt-4 pr-40">
                         Add healthy foods to increase your cart's health score! (AI generated assessment)
                       </p>
                     )}
                   </div>
-                  {/* Expand Button at Top - shows when more than 4 items and currently collapsed */}
-                  {shouldShowExpandButton && !cartExpanded && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => setCartExpanded(true)}
-                      className="text-gray-600 hover:text-gray-800 flex-shrink-0"
-                    >
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      Show {hiddenItemsCount} More
-                    </Button>
-                  )}
                 </div>
               </CardHeader>
 
@@ -424,17 +411,28 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
                   </div>
                 ))}
 
-                {/* Collapse Button at Bottom - shows when expanded and more than 4 items */}
-                {shouldShowExpandButton && cartExpanded && (
-                  <div className="text-center pt-4">
-                    <Button
-                      variant="ghost"
-                      onClick={() => setCartExpanded(false)}
-                      className="text-gray-600 hover:text-gray-800"
-                    >
-                      <ChevronUp className="h-4 w-4 mr-2" />
-                      Show Less
-                    </Button>
+                {/* Expand/Collapse Button at Bottom */}
+                {shouldShowExpandButton && (
+                  <div className="text-center pt-4 border-t">
+                    {!cartExpanded ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setCartExpanded(true)}
+                        className="text-gray-600 hover:text-gray-800"
+                      >
+                        <ChevronDown className="h-4 w-4 mr-2" />
+                        Show {hiddenItemsCount} More Items
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setCartExpanded(false)}
+                        className="text-gray-600 hover:text-gray-800"
+                      >
+                        <ChevronUp className="h-4 w-4 mr-2" />
+                        Show Less
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -454,7 +452,7 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
                     <RadioGroupItem value="pickup" id="pickup" />
                     <Label htmlFor="pickup" className="flex items-center cursor-pointer">
                       <Store className="h-4 w-4 mr-2" />
-                      Store Pickup
+                      Curbside Pick-Up
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">

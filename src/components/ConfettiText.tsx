@@ -25,38 +25,45 @@ const ConfettiText = ({ children, trigger, className = '' }: ConfettiTextProps) 
   useEffect(() => {
     if (!trigger || !textRef.current) return;
 
-    // Get the actual position of the text element
+    // Get the container dimensions for relative positioning
     const rect = textRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
 
-    // Create more confetti particles with bigger spread
+    // Create confetti particles positioned within the container width
     const newParticles = Array.from({ length: 24 }, (_, i) => ({
       id: i,
-      x: centerX + (Math.random() * 200 - 100), // Wider spread around text center
-      y: centerY - 50 - Math.random() * 50, // Start above the text
+      x: Math.random() * containerWidth, // Spread within container width only
+      y: 0, // Start at the very top of the container
       color: colors[Math.floor(Math.random() * colors.length)],
       rotation: Math.random() * 360,
-      velocityX: (Math.random() - 0.5) * 6, // More horizontal movement
-      velocityY: Math.random() * 3 + 2, // Faster downward movement
-      size: Math.random() * 6 + 4 // Bigger particles (4-10px)
+      velocityX: (Math.random() - 0.5) * 3,
+      velocityY: Math.random() * 2 + 1,
+      size: Math.random() * 6 + 4 // Reduced from 12 + 8 to 6 + 4
     }));
 
     setParticles(newParticles);
 
-    // Remove particles after longer animation
+    // Remove particles after animation
     const timer = setTimeout(() => {
       setParticles([]);
-    }, 4000);
+    }, 2000); // Reduced from 4000 to 2000
 
     return () => clearTimeout(timer);
   }, [trigger]);
 
   return (
-    <div className={`relative ${className}`} ref={textRef}>
+    <div className={`relative overflow-visible ${className}`} ref={textRef}>
       {children}
       {particles.length > 0 && (
-        <div className="fixed inset-0 pointer-events-none z-50">
+        <div className="absolute pointer-events-none overflow-visible" 
+             style={{ 
+               top: 0, 
+               left: 0, 
+               width: '100%', 
+               height: '200%',
+               zIndex: 9999 
+             }}>
           {particles.map((particle) => (
             <div
               key={particle.id}
@@ -68,10 +75,10 @@ const ConfettiText = ({ children, trigger, className = '' }: ConfettiTextProps) 
                 height: `${particle.size}px`,
                 backgroundColor: particle.color,
                 transform: `rotate(${particle.rotation}deg)`,
-                animation: `confetti-fall 4s ease-out forwards`,
-                animationDelay: `${Math.random() * 0.5}s`,
+                animation: `confetti-fall 2s ease-out forwards`, // Reduced from 4s to 2s
+                animationDelay: `${Math.random() * 0.3}s`,
                 borderRadius: '2px',
-                willChange: 'transform, opacity' // Optimize for animations
+                willChange: 'transform, opacity'
               }}
             />
           ))}
@@ -83,8 +90,11 @@ const ConfettiText = ({ children, trigger, className = '' }: ConfettiTextProps) 
             transform: translateY(0) rotate(0deg) scale(1);
             opacity: 1;
           }
+          70% {
+            opacity: 1;
+          }
           100% {
-            transform: translateY(100vh) rotate(720deg) scale(0.8);
+            transform: translateY(110px) rotate(360deg) scale(0.8); /* Reduced from 220px to 110px */
             opacity: 0;
           }
         }
