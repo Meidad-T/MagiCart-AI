@@ -31,22 +31,22 @@ const Header = ({ items, cart, onAddToCart, onCartClick, user }: HeaderProps) =>
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 border-b border-blue-300 shadow-lg">
+    <header className="sticky top-0 z-50 bg-gradient-to-r from-blue-500/80 via-blue-600/80 to-blue-800/80 backdrop-blur border-b border-blue-400/20 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <div className="flex-shrink-0">
             <Button 
               variant="ghost" 
               onClick={() => navigate('/')}
-              className="flex items-center space-x-3 text-white hover:bg-blue-400/20 transition-colors"
+              className="flex items-center space-x-3 text-white hover:bg-white/10 transition-colors px-2 h-auto"
             >
               <img 
                 src="/lovable-uploads/81065ad7-a689-4ec6-aa59-520f3ed2aa9c.png" 
                 alt="MagiCart Logo" 
-                className="h-10 w-10"
+                className="h-12 w-12"
               />
-              <span className="text-2xl font-bold">MagiCart</span>
+              <span className="text-3xl font-bold">MagiCart</span>
             </Button>
           </div>
 
@@ -59,13 +59,13 @@ const Header = ({ items, cart, onAddToCart, onCartClick, user }: HeaderProps) =>
           </div>
 
           {/* Right side actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             {/* User Menu */}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative text-white hover:bg-blue-400/20">
-                    <User className="h-6 w-6" />
+                  <Button variant="ghost" className="relative text-white hover:bg-white/10 rounded-full w-10 h-10">
+                    <User className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -79,8 +79,7 @@ const Header = ({ items, cart, onAddToCart, onCartClick, user }: HeaderProps) =>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button variant="ghost" onClick={handleSignIn} className="text-white hover:bg-blue-400/20">
-                <User className="h-6 w-6 mr-2" />
+              <Button onClick={handleSignIn} className="text-white bg-white/10 hover:bg-white/20">
                 Sign In
               </Button>
             )}
@@ -88,12 +87,12 @@ const Header = ({ items, cart, onAddToCart, onCartClick, user }: HeaderProps) =>
             {/* Cart Button */}
             <Button 
               variant="ghost" 
-              className="relative text-white hover:bg-blue-400/20"
+              className="relative text-white hover:bg-white/10 rounded-full w-10 h-10"
               onClick={onCartClick}
             >
-              <ShoppingCart className="h-6 w-6" />
+              <ShoppingCart className="h-5 w-5" />
               {cart.length > 0 && (
-                <Badge className="absolute -top-2 -right-2 bg-orange-500 text-white min-w-5 h-5 flex items-center justify-center text-xs">
+                <Badge className="absolute -top-1 -right-1 bg-orange-500 text-white min-w-5 h-5 flex items-center justify-center text-xs p-1">
                   {cart.reduce((sum, item) => sum + item.quantity, 0)}
                 </Badge>
               )}
