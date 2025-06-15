@@ -149,13 +149,6 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
     return "from-red-500 to-red-600";
   };
 
-  const getHealthScoreGlow = (score: number) => {
-    if (score >= 85) return "shadow-green-500/20";
-    if (score >= 70) return "shadow-yellow-500/20";
-    if (score >= 50) return "shadow-orange-500/20";
-    return "shadow-red-500/30";
-  };
-
   const calculateStoreTotals = () => {
     const stores = ['walmart', 'heb', 'aldi', 'target', 'kroger', 'sams'];
     const storeNames = {
@@ -334,51 +327,50 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
           {/* Cart Items */}
           <div className="md:col-span-2 space-y-4">
             <Card className="relative">
-              <CardHeader className="pb-2">
+              <CardHeader>
                 <div className="flex justify-between items-start">
-                  <div className="flex-1 pr-4">
+                  <div>
                     <CardTitle>Cart Items ({cart.length})</CardTitle>
-                    {/* Health Score Tip - with improved wrapping and more spacing below */}
-                    {cart.length > 0 && (
-                      <p className="text-xs text-gray-400 mt-8 max-w-xs"
-                        style={{ wordBreak: "break-word" }}
-                      >
-                        Add healthy foods to increase your cart's health score! (AI generated assessment)
-                      </p>
-                    )}
                   </div>
                   {/* Expand Button at Top - shows when more than 4 items and currently collapsed */}
                   {shouldShowExpandButton && !cartExpanded && (
                     <Button
                       variant="ghost"
                       onClick={() => setCartExpanded(true)}
-                      className="text-gray-600 hover:text-gray-800 flex-shrink-0"
+                      className="text-gray-600 hover:text-gray-800"
                     >
                       <ChevronDown className="h-4 w-4 mr-2" />
                       Show {hiddenItemsCount} More
                     </Button>
                   )}
                 </div>
+                {/* Health Score Tip */}
+                {cart.length > 0 && (
+                  <p className="text-xs text-gray-400">
+                    Add healthy foods to increase your cart's health score! (AI generated assessment)
+                  </p>
+                )}
               </CardHeader>
 
-              {/* Health Score Container - Top Right Corner with equal spacing */}
+              {/* Health Score Container - Top Right Corner */}
               {cart.length > 0 && (
-                <div className="absolute top-6 right-6 z-10">
-                  <div className={`bg-gradient-to-r ${getHealthScoreGradient(healthScore)} rounded-lg px-4 py-3 shadow-lg ${getHealthScoreGlow(healthScore)} transform hover:scale-105 transition-all duration-300`}>
-                    <div className="text-center text-white min-w-[120px]">
-                      <p className="text-xs font-medium opacity-90 mb-2">Health Score</p>
+                <div className="absolute top-4 right-4 z-10">
+                  <div className={`bg-gradient-to-r ${getHealthScoreGradient(healthScore)} rounded-xl p-4 shadow-lg transform hover:scale-105 transition-all duration-300`}>
+                    <div className="text-center text-white">
+                      <p className="text-xs font-medium opacity-90 mb-1">Health Score</p>
                       <ConfettiText trigger={confettiTrigger}>
-                        <div className="text-2xl font-bold mb-2">
+                        <div className="text-3xl font-bold mb-1 animate-pulse">
                           {healthScore}
                         </div>
                       </ConfettiText>
-                      <p className="text-sm opacity-90 font-semibold">{getHealthScoreLabel(healthScore)}</p>
+                      <p className="text-xs opacity-80">{getHealthScoreLabel(healthScore)}</p>
                     </div>
+                    <div className="absolute inset-0 bg-white opacity-10 rounded-xl animate-pulse"></div>
                   </div>
                 </div>
               )}
 
-              <CardContent className="space-y-4 pt-16">
+              <CardContent className="space-y-4">
                 {itemsToShow.map((item) => (
                   <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
