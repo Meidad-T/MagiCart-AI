@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { ProductWithPrices } from "@/types/database";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { PriceComparison } from "@/components/PriceComparison";
+import { AIRecommendation } from "@/components/AIRecommendation";
 
 interface CartPageProps {
   cart: Array<ProductWithPrices & { quantity: number }>;
@@ -22,6 +23,7 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<{ full_name?: string } | null>(null);
   const [cartExpanded, setCartExpanded] = useState(false);
+  const [substitutionCounts, setSubstitutionCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     // Get current user
@@ -79,12 +81,50 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
 
       const taxesAndFees = subtotal * 0.0875; // 8.75% tax rate
 
+      // Calculate store-specific fees based on shopping type
+      let storeFee = 0;
+      
+      if (shoppingType === 'pickup') {
+        switch (store) {
+          case 'walmart':
+            storeFee = 1.99;
+            break;
+          case 'sams':
+            storeFee = subtotal >= 50 ? 0 : 4.99;
+            break;
+          case 'heb':
+            storeFee = 0; // Free pickup
+            break;
+          // Aldi, Target, Kroger have no pickup fees mentioned
+        }
+      } else if (shoppingType === 'delivery') {
+        switch (store) {
+          case 'walmart':
+            storeFee = subtotal >= 35 ? 0 : 7.95;
+            break;
+          case 'heb':
+            storeFee = 4.95;
+            break;
+          case 'aldi':
+            storeFee = subtotal >= 35 ? 0 : 3.99;
+            break;
+          case 'kroger':
+            storeFee = subtotal >= 35 ? 0 : 4.95;
+            break;
+          // Target and Sam's Club delivery fees not specified
+        }
+      }
+      // In-store shopping has no additional fees
+
+      const totalFeesAndTaxes = taxesAndFees + storeFee;
+      const total = subtotal + totalFeesAndTaxes;
+
       return {
         store: storeNames[store as keyof typeof storeNames],
         storeKey: store,
         subtotal: subtotal.toFixed(2),
-        taxesAndFees: taxesAndFees.toFixed(2),
-        total: (subtotal + taxesAndFees).toFixed(2)
+        taxesAndFees: totalFeesAndTaxes.toFixed(2),
+        total: total.toFixed(2)
       };
     });
 
@@ -114,8 +154,18 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
 
   const storeTotals = calculateStoreTotals();
 
-  // Determine which items to show
-  const shouldCollapse = cart.length > 8;
+  // Store brand colors
+  const storeColors = {
+    'H-E-B': '#e31837',
+    'Walmart': '#004c91',
+    'Target': '#cc0000',
+    'Kroger': '#0f4c81',
+    'Sam\'s Club': '#00529c',
+    'Aldi': '#ff6900'
+  };
+
+  // Determine which items to show - changed from 8 to 5
+  const shouldCollapse = cart.length > 5;
   const itemsToShow = shouldCollapse && !cartExpanded ? cart.slice(0, 4) : cart;
 
   if (cart.length === 0) {
@@ -152,6 +202,9 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
     return userProfile.full_name.split(' ')[0];
   };
 
+  const cheapestStore = storeTotals[0]; // First one is cheapest due to sorting
+  const cheapestStoreColor = storeColors[cheapestStore?.store as keyof typeof storeColors] || '#3b82f6';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -184,7 +237,7 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle>Cart Items ({cart.length})</CardTitle>
-                  {/* Expand Button at Top */}
+                  {/* Expand Button at Top - now shows for 5+ items */}
                   {shouldCollapse && !cartExpanded && (
                     <Button
                       variant="ghost"
@@ -314,19 +367,30 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
               </Card>
             )}
 
-            {/* Next Step Button */}
+            {/* Continue with Cheapest Store Button */}
             <Card>
               <CardContent className="pt-6">
                 <Button
-                  className="w-full bg-blue-500 hover:bg-blue-600"
+                  className="w-full text-white hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: cheapestStoreColor }}
                   onClick={() =>
                     navigate("/checkout-details", {
-                      state: { shoppingType }
+                      state: { 
+                        shoppingType,
+                        cheapestStore: cheapestStore?.store,
+                        orderTotal: parseFloat(cheapestStore?.total || '0'),
+                        itemCount: cart.length
+                      }
                     })
                   }
                 >
-                  Next Step
+                  Continue with {cheapestStore?.store}
                 </Button>
+                {cheapestStore && (
+                  <p className="text-sm text-gray-600 text-center mt-2">
+                    Best price: ${cheapestStore.total}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -338,6 +402,16 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
             storeTotals={storeTotals} 
             cart={cart}
             onUpdateCart={onUpdateCart}
+            onSubstitutionCountsChange={setSubstitutionCounts}
+          />
+        </div>
+
+        {/* AI Recommendation */}
+        <div className="mt-6">
+          <AIRecommendation 
+            storeTotals={storeTotals}
+            substitutionCounts={substitutionCounts}
+            shoppingType={shoppingType}
           />
         </div>
       </div>

@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ interface PriceComparisonProps {
   storeTotals: StoreTotalData[];
   cart: Array<any>;
   onUpdateCart: (updatedCart: Array<any>) => void;
+  onSubstitutionCountsChange: (counts: Record<string, number>) => void;
 }
 
 interface SubstitutionItem {
@@ -26,7 +26,7 @@ interface SubstitutionItem {
   status: 'pending' | 'accepted' | 'rejected';
 }
 
-export const PriceComparison = ({ storeTotals, cart, onUpdateCart }: PriceComparisonProps) => {
+export const PriceComparison = ({ storeTotals, cart, onUpdateCart, onSubstitutionCountsChange }: PriceComparisonProps) => {
   const [expandedStore, setExpandedStore] = useState<string | null>(null);
   const [showRejectWarning, setShowRejectWarning] = useState<string | null>(null);
   const [substitutions, setSubstitutions] = useState<Record<string, SubstitutionItem[]>>({});
@@ -153,6 +153,15 @@ export const PriceComparison = ({ storeTotals, cart, onUpdateCart }: PriceCompar
     return subs.filter(sub => sub.status === 'pending').length;
   };
 
+  // Update parent component with substitution counts
+  React.useEffect(() => {
+    const counts: Record<string, number> = {};
+    storeTotals.forEach(store => {
+      counts[store.storeKey] = getSubstitutionCount(store.storeKey);
+    });
+    onSubstitutionCountsChange(counts);
+  }, [substitutions, storeTotals, onSubstitutionCountsChange]);
+
   const handleSubstitutionAction = (storeKey: string, index: number, action: 'accept' | 'reject') => {
     if (action === 'reject') {
       setShowRejectWarning(`${storeKey}-${index}`);
@@ -206,6 +215,7 @@ export const PriceComparison = ({ storeTotals, cart, onUpdateCart }: PriceCompar
               <TableHead className="font-semibold">Store</TableHead>
               <TableHead className="font-semibold">Subtotal</TableHead>
               <TableHead className="font-semibold">Taxes & Fees</TableHead>
+              <TableHead className="font-semibold">Total Price</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -229,11 +239,14 @@ export const PriceComparison = ({ storeTotals, cart, onUpdateCart }: PriceCompar
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="font-semibold text-lg">
+                    <TableCell className="font-semibold">
                       ${store.subtotal}
                     </TableCell>
                     <TableCell className="text-gray-600">
                       ${store.taxesAndFees}
+                    </TableCell>
+                    <TableCell className="font-bold text-lg">
+                      ${store.total}
                     </TableCell>
                     <TableCell>
                       {hasSubstitutions ? (
@@ -261,7 +274,7 @@ export const PriceComparison = ({ storeTotals, cart, onUpdateCart }: PriceCompar
                   {/* Expanded substitution details */}
                   {isExpanded && hasSubstitutions && (
                     <TableRow>
-                      <TableCell colSpan={4} className="bg-gray-50 p-4">
+                      <TableCell colSpan={5} className="bg-gray-50 p-4">
                         <div className="space-y-3">
                           <h4 className="font-medium text-gray-800 mb-3">Substitution Details:</h4>
                           {storeSubstitutions.map((sub, subIndex) => (
@@ -348,13 +361,6 @@ export const PriceComparison = ({ storeTotals, cart, onUpdateCart }: PriceCompar
             </div>
           </div>
         )}
-        
-        <div className="mt-6 flex justify-center">
-          <Button className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-lg text-lg">
-            <RefreshCw className="h-5 w-5 mr-2" />
-            Review Substitutions
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );
