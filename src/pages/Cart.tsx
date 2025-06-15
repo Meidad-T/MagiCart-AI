@@ -371,7 +371,7 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
             <Card>
               <CardContent className="pt-6">
                 <Button
-                  className="w-full text-white hover:opacity-90 transition-opacity"
+                  className="w-full text-white mb-3"
                   style={{ backgroundColor: cheapestStoreColor }}
                   onClick={() =>
                     navigate("/checkout-details", {
@@ -387,21 +387,39 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
                   Continue with {cheapestStore?.store}
                 </Button>
                 {cheapestStore && (
-                  <p className="text-sm text-gray-600 text-center mt-2">
+                  <p className="text-sm text-gray-600 text-center">
                     Best price: ${cheapestStore.total}
                   </p>
                 )}
               </CardContent>
             </Card>
-          </div>
-        </div>
 
-        {/* Intelligent Recommendation */}
-        <div className="mt-8">
-          <IntelligentRecommendation 
-            storeTotals={storeTotals}
-            shoppingType={shoppingType}
-          />
+            {/* AI Health Recommendations Button */}
+            <Card>
+              <CardContent className="pt-6">
+                <Button
+                  variant="outline"
+                  className="w-full border-blue-500 text-blue-600 hover:bg-blue-50"
+                  onClick={() =>
+                    navigate("/health-recommendations", {
+                      state: { 
+                        shoppingType,
+                        cheapestStore: cheapestStore?.store,
+                        orderTotal: parseFloat(cheapestStore?.total || '0'),
+                        itemCount: cart.length
+                      }
+                    })
+                  }
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Get AI Health Recommendations
+                </Button>
+                <p className="text-sm text-gray-600 text-center mt-2">
+                  Discover personalized healthy additions
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Price Comparison Component */}
@@ -411,6 +429,14 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
             cart={cart}
             onUpdateCart={onUpdateCart}
             onSubstitutionCountsChange={setSubstitutionCounts}
+          />
+        </div>
+
+        {/* Intelligent Recommendation */}
+        <div className="mt-8">
+          <IntelligentRecommendation 
+            storeTotals={storeTotals}
+            shoppingType={shoppingType}
           />
         </div>
       </div>

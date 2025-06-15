@@ -1,99 +1,108 @@
-import { MapContainer, TileLayer, Polyline, Marker, useMap } from "react-leaflet";
-import L from "leaflet";
-import { useEffect } from "react";
-import "leaflet/dist/leaflet.css";
 
-// Cute custom icons
-const startIcon = L.divIcon({
-  html: '🏠',
-  className: '',
-  iconSize: [36, 36],
-  iconAnchor: [18, 36],
-});
-const storeIcon = L.divIcon({
-  html: '<div style="background: white; border-radius: 50%; box-shadow: 0 1px 6px #888; display:inline-block"><img src="/lovable-uploads/9b4bb088-c2c8-4cdf-90f7-bd262770965e.png" alt="Store" style="width:32px; height:32px; vertical-align:middle; border-radius:50%;" /></div>',
-  className: '',
-  iconSize: [38, 38],
-  iconAnchor: [19, 38],
-});
-
-function fitRoute(map: any, points: [number, number][]) {
-  if (map && points.length > 1) {
-    const bounds = L.latLngBounds(points);
-    // Heavily pad the bounds to keep everything tight and cute
-    map.fitBounds(bounds, { padding: [90, 90], maxZoom: 19, animate: false });
-    // Lock bounds and zoom tight, so user can't move out
-    map.setMinZoom(18);
-    map.setMaxZoom(20);
-    map.setMaxBounds(bounds.pad(0.7));
-  }
-}
-
-function MapFitter({ points }: { points: [number, number][] }) {
-  const map = useMap();
-  useEffect(() => {
-    fitRoute(map, points);
-  }, [map, points]);
-  return null;
-}
+import { GoogleMap, DirectionsRenderer, useLoadScript } from "@react-google-maps/api";
+import { useState, useEffect } from "react";
 
 type PickupMapProps = {
   start: [number, number] | null, // [lat, lng]
   dest: [number, number] | null,  // [lat, lng]
 };
 
+// Move libraries array outside component to prevent reloading
+const GOOGLE_MAPS_LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
+
 export default function PickupMap({ start, dest }: PickupMapProps) {
-  if (!start || !dest)
+  const googleMapsApiKey = import.meta.env.VITE_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+  const [directionsResult, setDirectionsResult] = useState<google.maps.DirectionsResult | null>(null);
+
+  // Debug logging
+  console.log("Google Maps API Key:", googleMapsApiKey ? "Present" : "Missing");
+  console.log("Start coords:", start);
+  console.log("Dest coords:", dest);
+
+  // All hooks MUST be called unconditionally, before any early returns
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey,
+    libraries: GOOGLE_MAPS_LIBRARIES,
+  });
+
+  // Log any load errors
+  useEffect(() => {
+    if (loadError) {
+      console.error("Google Maps load error:", loadError);
+    }
+  }, [loadError]);
+
+  // Calculate directions when start/dest change
+  useEffect(() => {
+    if (isLoaded && start && dest && window.google) {
+      console.log("Attempting to calculate directions...");
+      const directionsService = new window.google.maps.DirectionsService();
+      
+      directionsService.route(
+        {
+          origin: { lat: start[0], lng: start[1] },
+          destination: { lat: dest[0], lng: dest[1] },
+          travelMode: window.google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          console.log("Directions result:", { result, status });
+          if (status === window.google.maps.DirectionsStatus.OK && result) {
+            setDirectionsResult(result);
+          } else {
+            console.error("Directions request failed:", status);
+            setDirectionsResult(null);
+          }
+        }
+      );
+    }
+  }, [isLoaded, start, dest]);
+
+  // Handle load error
+  if (loadError) {
+    return (
+      <div className="bg-red-100 h-36 rounded-xl flex items-center justify-center text-red-600 p-4">
+        <div className="text-center">
+          <p className="font-semibold">Map failed to load</p>
+          <p className="text-sm mt-1">Check API key and domain restrictions</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Now it's safe to conditionally render
+  if (!isLoaded || !start || !dest) {
     return (
       <div className="bg-gray-100 h-36 rounded-xl flex items-center justify-center text-gray-400">
         Map loading…
       </div>
     );
-
-  const straightLine: [number, number][] = [start, dest];
+  }
 
   return (
     <div
-      className="w-full rounded-xl overflow-hidden border border-blue-100 shadow mb-2 relative"
-      style={{ height: 220, background: "#eaf3ff" }}
+      className="w-full rounded-xl overflow-hidden border border-gray-300 shadow mb-2"
+      style={{ height: 300 }}
     >
-      <MapContainer
-        style={{
-          width: "100%",
-          height: "100%",
-          transition: "filter 0.2s",
-        }}
-        zoom={19}
-        minZoom={18}
-        maxZoom={20}
-        center={[(start[0] + dest[0]) / 2, (start[1] + dest[1]) / 2]}
-        dragging={false}
-        scrollWheelZoom={false}
-        doubleClickZoom={false}
-        zoomControl={false}
-        attributionControl={false}
-        closePopupOnClick={false}
+      <GoogleMap
+        mapContainerStyle={{ width: "100%", height: "100%" }}
+        zoom={13}
+        center={{ lat: (start[0] + dest[0]) / 2, lng: (start[1] + dest[1]) / 2 }}
       >
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-        <Polyline
-          positions={straightLine}
-          pathOptions={{
-            color: "#3786F1",
-            weight: 13,
-            opacity: 0.94,
-            dashArray: "",
-            lineCap: "round",
-            className: "pickup-cute-route"
-          }}
-        />
-        <Marker position={start} icon={startIcon} />
-        <Marker position={dest} icon={storeIcon} />
-        <MapFitter points={straightLine} />
-      </MapContainer>
-      {/* Remove white overlay for a more vibrant, Waze-like view */}
-      {/* marker layer is already prominent */}
-      {/* Border for nice modern look */}
-      <div className="absolute inset-0 border-[3px] border-blue-300 pointer-events-none rounded-xl" style={{ zIndex: 20, opacity: 0.23 }} />
+        {/* Show directions route with default Google Maps styling */}
+        {directionsResult && (
+          <DirectionsRenderer
+            directions={directionsResult}
+            options={{
+              suppressMarkers: false, // Show default Google Maps markers
+              polylineOptions: {
+                strokeColor: "#4285F4", // Google's default blue
+                strokeWeight: 6,
+                strokeOpacity: 0.8,
+              },
+            }}
+          />
+        )}
+      </GoogleMap>
     </div>
   );
 }
