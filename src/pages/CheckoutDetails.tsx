@@ -12,6 +12,7 @@ import StoreHoursAlert, { validateStoreHours } from "@/components/StoreHoursAler
 import { getDistance } from "@/utils/geo";
 import { Loader2 } from "lucide-react";
 import { Database } from "@/integrations/supabase/types";
+import { StoreRecommendation } from "@/components/StoreRecommendation";
 
 type ShoppingType = 'pickup' | 'delivery' | 'instore';
 
@@ -28,7 +29,7 @@ interface LocationState {
 }
 
 type StoreLocation = Database['public']['Tables']['store_locations']['Row'];
-type StoreWithDistance = StoreLocation & { distance: number };
+type StoreWithDistance = StoreLocation & { distance: number; logo_url?: string };
 
 export default function CheckoutDetails() {
   const navigate = useNavigate();
@@ -78,6 +79,8 @@ export default function CheckoutDetails() {
   const [isFetchingStores, setIsFetchingStores] = useState(false);
   const [nearbyStores, setNearbyStores] = useState<StoreWithDistance[]>([]);
   const [selectedStore, setSelectedStore] = useState<StoreWithDistance | null>(null);
+  const [showAllStores, setShowAllStores] = useState(false);
+  const [isChoosingAlternateStore, setIsChoosingAlternateStore] = useState(false);
 
   // Geocode single address (when route optimization is off)
   useEffect(() => {
@@ -163,6 +166,8 @@ export default function CheckoutDetails() {
         setStoreLoc(null); // Reset store location
         setSelectedStore(null);
         setNearbyStores([]);
+        setShowAllStores(false); // Reset on new search
+        setIsChoosingAlternateStore(false); // Reset on new search
         setIsFetchingStores(true);
 
         try {
@@ -182,6 +187,20 @@ export default function CheckoutDetails() {
           }
 
           if (data && data.stores && data.stores.length > 0) {
+            // Fetch store logos to match with locations
+            const { data: storesWithLogos } = await supabase
+              .from('stores')
+              .select('name, logo_url');
+
+            const logoMap = new Map<string, string | null>();
+            if (storesWithLogos) {
+              for (const s of storesWithLogos) {
+                if (s.name && s.logo_url) {
+                  logoMap.set(s.name, s.logo_url);
+                }
+              }
+            }
+
             const userLat = userLoc[0];
             const userLon = userLoc[1];
 
@@ -189,16 +208,30 @@ export default function CheckoutDetails() {
               .map((store: StoreLocation) => {
                 if (store.latitude && store.longitude) {
                   const distance = getDistance(userLat, userLon, store.latitude, store.longitude);
-                  return { ...store, distance };
+                  const logo_url = logoMap.get(store.chain) || undefined;
+                  return { ...store, distance, logo_url };
                 }
                 return null;
               })
               .filter((s): s is StoreWithDistance => s !== null);
 
-            storesWithDistance.sort((a, b) => a.distance - b.distance);
+            // De-duplicate stores based on address to avoid showing same location twice
+            const uniqueStoresMap = new Map<string, StoreWithDistance>();
+            storesWithDistance.forEach(store => {
+              if (store.address_line1 && !uniqueStoresMap.has(store.address_line1)) {
+                uniqueStoresMap.set(store.address_line1, store);
+              }
+            });
+            const uniqueStores = Array.from(uniqueStoresMap.values());
+            uniqueStores.sort((a, b) => a.distance - b.distance);
             
-            setNearbyStores(storesWithDistance);
-            console.log(`Found ${storesWithDistance.length} nearby stores via Google.`);
+            setNearbyStores(uniqueStores);
+            console.log(`Found ${uniqueStores.length} unique nearby stores via Google.`);
+
+            // Auto-select the closest store if one isn't already selected
+            if (uniqueStores.length > 0) {
+              handleSelectStore(uniqueStores[0], false); // Auto-select without hiding picker
+            }
           } else {
             console.warn(`No stores found for chain: ${cheapestStore}.`);
           }
@@ -212,11 +245,14 @@ export default function CheckoutDetails() {
     fetchRecommendedStore();
   }, [shoppingType, cheapestStore, workLoc, singleLoc, routeOptimization]);
 
-  const handleSelectStore = (store: StoreWithDistance) => {
+  const handleSelectStore = (store: StoreWithDistance, hidePicker = true) => {
     setSelectedStore(store);
     if (store.latitude && store.longitude) {
       setStoreLoc([store.latitude, store.longitude]);
       setActualStoreName(store.name);
+    }
+    if (hidePicker) {
+      setIsChoosingAlternateStore(false);
     }
   };
 
@@ -417,20 +453,54 @@ export default function CheckoutDetails() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <span>Finding nearby stores...</span>
                     </div>
-                  ) : nearbyStores.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-600">We found these stores near you. Please select one.</p>
-                      {nearbyStores.map(store => (
-                        <div 
-                          key={store.id}
-                          onClick={() => handleSelectStore(store)}
-                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedStore?.id === store.id ? 'border-primary bg-primary/10' : 'border-gray-200 hover:border-gray-300'}`}
-                        >
-                          <div className="font-semibold">{store.name}</div>
-                          <div className="text-sm text-gray-500">{store.address_line1}, {store.city}</div>
-                          <div className="text-sm font-medium text-primary">{store.distance.toFixed(1)} miles away</div>
+                  ) : nearbyStores.length > 0 && selectedStore ? (
+                    <div className="space-y-4">
+                      <StoreRecommendation
+                        store={selectedStore}
+                        onClick={() => handleSelectStore(selectedStore)}
+                        onModify={() => {
+                          if (isChoosingAlternateStore) {
+                            // If the picker is open, close it.
+                            setIsChoosingAlternateStore(false);
+                          } else {
+                            // If the picker is closed, open it and reset the 'show all' view.
+                            setShowAllStores(false);
+                            setIsChoosingAlternateStore(true);
+                          }
+                        }}
+                        otherStoresCount={nearbyStores.length - 1}
+                      />
+
+                      {isChoosingAlternateStore && (
+                        <div className="animate-fade-in space-y-2 pt-4">
+                          <h4 className="font-medium text-gray-800">Other nearby locations</h4>
+                          {(showAllStores 
+                            ? nearbyStores.filter(s => s.id !== selectedStore.id) 
+                            : nearbyStores.filter(s => s.id !== selectedStore.id).slice(0, 2)
+                          ).map(store => (
+                            <div
+                              key={store.id}
+                              onClick={() => handleSelectStore(store)}
+                              className="p-3 border rounded-lg cursor-pointer transition-colors border-gray-200 hover:border-gray-300"
+                            >
+                              <div className="font-semibold">{store.name}</div>
+                              <div className="text-sm text-gray-500">{store.address_line1}{store.city ? `, ${store.city}` : ''}</div>
+                              <div className="text-sm font-medium text-primary">{store.distance.toFixed(1)} miles away</div>
+                            </div>
+                          ))}
+                          
+                          {/* Logic for "Show more" button for alternate stores */}
+                          {nearbyStores.filter(s => s.id !== selectedStore.id).length > 2 && !showAllStores && (
+                            <Button 
+                              variant="link" 
+                              className="p-0 h-auto text-blue-600" 
+                              onClick={() => setShowAllStores(true)}
+                            >
+                              Show {nearbyStores.filter(s => s.id !== selectedStore.id).length - 2} more stores...
+                            </Button>
+                          )}
                         </div>
-                      ))}
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500">No stores found for {cheapestStore} near the provided address. Please try a different address.</p>
@@ -478,6 +548,7 @@ export default function CheckoutDetails() {
                     dest={routeOptimization ? homeLoc : singleLoc} 
                     storeLocation={storeLoc}
                     storeName={actualStoreName}
+                    storeLogoUrl={selectedStore?.logo_url}
                   />
                   <p className="text-xs text-gray-400 text-center mt-1">
                     <span role="img" aria-label="info">🗺️</span> {routeOptimization 
