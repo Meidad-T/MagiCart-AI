@@ -1,5 +1,5 @@
 
-import { ShoppingCart, User, LogOut } from "lucide-react";
+import { ShoppingCart, User, LogOut, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -30,6 +30,10 @@ const Header = ({ items, cart, onAddToCart, onCartClick, user }: HeaderProps) =>
     navigate('/auth');
   };
 
+  const handleShoppingPlansClick = () => {
+    navigate('/shopping-plans');
+  };
+
   return (
     <header className="sticky top-0 z-50 bg-gradient-to-r from-blue-500/80 via-blue-600/80 to-blue-800/80 backdrop-blur border-b border-blue-400/20 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,12 +43,13 @@ const Header = ({ items, cart, onAddToCart, onCartClick, user }: HeaderProps) =>
             <Button 
               variant="ghost" 
               onClick={() => navigate('/')}
-              className="flex items-center space-x-3 text-white hover:bg-white/10 transition-colors px-2 h-auto"
+              className="flex items-center space-x-3 text-white hover:bg-white/10 hover:text-blue-100 transition-colors px-2 h-auto"
             >
               <img 
-                src="/lovable-uploads/81065ad7-a689-4ec6-aa59-520f3ed2aa9c.png" 
+                src="/lovable-uploads/626c14cb-fdb3-4472-8f02-7f33de90f3e0.png" 
                 alt="MagiCart Logo" 
-                className="h-12 w-12"
+                className="h-12 w-12 transform scale-x-[-1]"
+                loading="eager"
               />
               <span className="text-3xl font-bold">MagiCart</span>
             </Button>
@@ -60,6 +65,18 @@ const Header = ({ items, cart, onAddToCart, onCartClick, user }: HeaderProps) =>
 
           {/* Right side actions */}
           <div className="flex items-center space-x-2">
+            {/* Shopping Plans Button - only show if user is authenticated */}
+            {user && (
+              <Button 
+                variant="ghost" 
+                className="text-white hover:bg-white/10 rounded-full w-10 h-10"
+                onClick={handleShoppingPlansClick}
+                title="Shopping Plans"
+              >
+                <Calendar className="h-5 w-5" />
+              </Button>
+            )}
+
             {/* User Menu */}
             {user ? (
               <DropdownMenu>

@@ -1,9 +1,9 @@
-
 export interface Store {
   id: string;
   name: string;
   display_name: string;
   created_at: string;
+  logo_url?: string; // Added logo_url for custom store logos
 }
 
 export interface Category {
@@ -57,6 +57,25 @@ export interface ShoppingSession {
   session_data: any;
   shopping_type?: 'pickup' | 'delivery' | 'instore';
   store_preference?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShoppingPlan {
+  id: string;
+  user_id: string;
+  name: string;
+  items: any; // Changed from any[] to any to match Supabase Json type
+  frequency: 'none' | 'monthly' | 'weekly' | 'bi-weekly' | 'custom';
+  custom_frequency_days?: number;
+  store_name: string;
+  store_address?: string;
+  shopping_type: 'pickup' | 'delivery' | 'instore';
+  delivery_address?: string;
+  pickup_time?: string;
+  estimated_total: number;
+  item_count: number;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }

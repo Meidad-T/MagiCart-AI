@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, MapPin, Clock, Store, User, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Store, User, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import type { ProductWithPrices } from "@/types/database";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { PriceComparison } from "@/components/PriceComparison";
 import { IntelligentRecommendation } from "@/components/IntelligentRecommendation";
+import ConfettiText from "@/components/ConfettiText";
 
 interface CartPageProps {
   cart: Array<ProductWithPrices & { quantity: number }>;
@@ -24,6 +25,13 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
   const [userProfile, setUserProfile] = useState<{ full_name?: string } | null>(null);
   const [cartExpanded, setCartExpanded] = useState(false);
   const [substitutionCounts, setSubstitutionCounts] = useState<Record<string, number>>({});
+  const [confettiTrigger, setConfettiTrigger] = useState(false);
+  const [previousHealthScore, setPreviousHealthScore] = useState(0);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     // Get current user
@@ -62,6 +70,92 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const calculateCartHealthScore = () => {
+    if (cart.length === 0) return 0;
+    
+    let produceCount = 0;
+    let totalItems = 0;
+    
+    cart.forEach(item => {
+      totalItems += item.quantity;
+      
+      // Count produce items
+      const categoryName = item.category.name.toLowerCase();
+      const productName = item.name.toLowerCase();
+      
+      if (categoryName.includes('produce') || 
+          categoryName.includes('fruits') || 
+          categoryName.includes('vegetables') ||
+          productName.includes('organic')) {
+        produceCount += item.quantity;
+      }
+    });
+    
+    // If cart is ONLY produce, return 100
+    if (produceCount === totalItems && produceCount > 0) {
+      return 100;
+    }
+    
+    // New produce-based scoring system
+    if (produceCount === 0) return 20;
+    if (produceCount === 1) return 44;
+    if (produceCount === 2) return 57;
+    if (produceCount === 3) return 70;
+    if (produceCount === 4) return 81;
+    if (produceCount === 5) return 92;
+    if (produceCount === 6) return 98;
+    if (produceCount >= 7) return 100;
+    
+    return 20; // fallback
+  };
+
+  const healthScore = calculateCartHealthScore();
+
+  // Trigger confetti when health score reaches excellent (85+)
+  useEffect(() => {
+    if (healthScore >= 85 && previousHealthScore < 85) {
+      setConfettiTrigger(true);
+      // Reset the trigger after a short delay
+      setTimeout(() => setConfettiTrigger(false), 100);
+    }
+    setPreviousHealthScore(healthScore);
+  }, [healthScore, previousHealthScore]);
+
+  // Auto-collapse when cart items reduce below the expand threshold
+  useEffect(() => {
+    if (cart.length <= 3 && cartExpanded) {
+      setCartExpanded(false);
+    }
+  }, [cart.length, cartExpanded]);
+
+  const getHealthScoreColor = (score: number) => {
+    if (score >= 85) return "text-green-600";
+    if (score >= 70) return "text-yellow-500";
+    if (score >= 50) return "text-orange-500";
+    return "text-red-600";
+  };
+
+  const getHealthScoreLabel = (score: number) => {
+    if (score >= 85) return "Excellent";
+    if (score >= 70) return "Good";
+    if (score >= 50) return "Fair";
+    return "Needs Improvement";
+  };
+
+  const getHealthScoreGradient = (score: number) => {
+    if (score >= 85) return "from-green-500 to-green-600";
+    if (score >= 70) return "from-yellow-500 to-yellow-600";
+    if (score >= 50) return "from-orange-500 to-orange-600";
+    return "from-red-500 to-red-600";
+  };
+
+  const getHealthScoreGlow = (score: number) => {
+    if (score >= 85) return "shadow-green-500/20";
+    if (score >= 70) return "shadow-yellow-500/20";
+    if (score >= 50) return "shadow-orange-500/20";
+    return "shadow-red-500/30";
+  };
+
   const calculateStoreTotals = () => {
     const stores = ['walmart', 'heb', 'aldi', 'target', 'kroger', 'sams'];
     const storeNames = {
@@ -93,7 +187,7 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
             storeFee = subtotal >= 50 ? 0 : 4.99;
             break;
           case 'heb':
-            storeFee = 0; // Free pickup
+            storeFee = 0; // Free curbside pickup
             break;
           // Aldi, Target, Kroger have no pickup fees mentioned
         }
@@ -111,7 +205,12 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
           case 'kroger':
             storeFee = subtotal >= 35 ? 0 : 4.95;
             break;
-          // Target and Sam's Club delivery fees not specified
+          case 'target':
+            storeFee = subtotal >= 35 ? 0 : 9.99;
+            break;
+          case 'sams':
+            storeFee = subtotal >= 50 ? 0 : 12.00;
+            break;
         }
       }
       // In-store shopping has no additional fees
@@ -164,9 +263,10 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
     'Aldi': '#ff6900'
   };
 
-  // Determine which items to show - changed from 8 to 5
-  const shouldCollapse = cart.length > 5;
-  const itemsToShow = shouldCollapse && !cartExpanded ? cart.slice(0, 4) : cart;
+  // Fixed logic: Always show max 3 items when collapsed, regardless of total count
+  const shouldShowExpandButton = cart.length > 3;
+  const itemsToShow = cartExpanded ? cart : cart.slice(0, 3);
+  const hiddenItemsCount = cart.length - 3;
 
   if (cart.length === 0) {
     return (
@@ -233,24 +333,39 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
         <div className="grid md:grid-cols-3 gap-6">
           {/* Cart Items */}
           <div className="md:col-span-2 space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>Cart Items ({cart.length})</CardTitle>
-                  {/* Expand Button at Top - now shows for 5+ items */}
-                  {shouldCollapse && !cartExpanded && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => setCartExpanded(true)}
-                      className="text-gray-600 hover:text-gray-800"
-                    >
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      Show {cart.length - 4} More
-                    </Button>
-                  )}
+            <Card className="relative">
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1 pr-4">
+                    <CardTitle>Cart Items ({cart.length})</CardTitle>
+                    {/* Health Score Tip - with proper wrapping and moved down */}
+                    {cart.length > 0 && (
+                      <p className="text-xs text-gray-400 mt-4 pr-40">
+                        Add healthy foods to increase your cart's health score! (AI generated assessment)
+                      </p>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+
+              {/* Health Score Container - Top Right Corner with equal spacing */}
+              {cart.length > 0 && (
+                <div className="absolute top-6 right-6 z-10">
+                  <div className={`bg-gradient-to-r ${getHealthScoreGradient(healthScore)} rounded-lg px-4 py-3 shadow-lg ${getHealthScoreGlow(healthScore)} transform hover:scale-105 transition-all duration-300`}>
+                    <div className="text-center text-white min-w-[120px]">
+                      <p className="text-xs font-medium opacity-90 mb-2">Health Score</p>
+                      <ConfettiText trigger={confettiTrigger}>
+                        <div className="text-2xl font-bold mb-2">
+                          {healthScore}
+                        </div>
+                      </ConfettiText>
+                      <p className="text-sm opacity-90 font-semibold">{getHealthScoreLabel(healthScore)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <CardContent className="space-y-4 pt-16">
                 {itemsToShow.map((item) => (
                   <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
@@ -296,17 +411,28 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
                   </div>
                 ))}
 
-                {/* Collapse Button at Bottom */}
-                {shouldCollapse && cartExpanded && (
-                  <div className="text-center pt-4">
-                    <Button
-                      variant="ghost"
-                      onClick={() => setCartExpanded(false)}
-                      className="text-gray-600 hover:text-gray-800"
-                    >
-                      <ChevronUp className="h-4 w-4 mr-2" />
-                      Show Less
-                    </Button>
+                {/* Expand/Collapse Button at Bottom */}
+                {shouldShowExpandButton && (
+                  <div className="text-center pt-4 border-t">
+                    {!cartExpanded ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setCartExpanded(true)}
+                        className="text-gray-600 hover:text-gray-800"
+                      >
+                        <ChevronDown className="h-4 w-4 mr-2" />
+                        Show {hiddenItemsCount} More Items
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setCartExpanded(false)}
+                        className="text-gray-600 hover:text-gray-800"
+                      >
+                        <ChevronUp className="h-4 w-4 mr-2" />
+                        Show Less
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -326,7 +452,7 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
                     <RadioGroupItem value="pickup" id="pickup" />
                     <Label htmlFor="pickup" className="flex items-center cursor-pointer">
                       <Store className="h-4 w-4 mr-2" />
-                      Store Pickup
+                      Curbside Pick-Up
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -367,11 +493,32 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
               </Card>
             )}
 
-            {/* Continue with Cheapest Store Button */}
+            {/* Combined Checkout & AI Recommendations */}
             <Card>
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 space-y-3">
                 <Button
-                  className="w-full text-white hover:opacity-90 transition-opacity"
+                  className="w-full bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white"
+                  onClick={() =>
+                    navigate("/health-recommendations", {
+                      state: { 
+                        shoppingType,
+                        cheapestStore: cheapestStore?.store,
+                        orderTotal: parseFloat(cheapestStore?.total || '0'),
+                        itemCount: cart.length
+                      }
+                    })
+                  }
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Get AI Health Recommendations
+                </Button>
+                
+                <p className="text-sm text-gray-600 text-center">
+                  Discover affordable and health additions
+                </p>
+                
+                <Button
+                  className="w-full text-white"
                   style={{ backgroundColor: cheapestStoreColor }}
                   onClick={() =>
                     navigate("/checkout-details", {
@@ -387,21 +534,13 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
                   Continue with {cheapestStore?.store}
                 </Button>
                 {cheapestStore && (
-                  <p className="text-sm text-gray-600 text-center mt-2">
+                  <p className="text-sm text-gray-600 text-center">
                     Best price: ${cheapestStore.total}
                   </p>
                 )}
               </CardContent>
             </Card>
           </div>
-        </div>
-
-        {/* Intelligent Recommendation */}
-        <div className="mt-8">
-          <IntelligentRecommendation 
-            storeTotals={storeTotals}
-            shoppingType={shoppingType}
-          />
         </div>
 
         {/* Price Comparison Component */}
@@ -411,6 +550,14 @@ const Cart = ({ cart, onUpdateCart }: CartPageProps) => {
             cart={cart}
             onUpdateCart={onUpdateCart}
             onSubstitutionCountsChange={setSubstitutionCounts}
+          />
+        </div>
+
+        {/* Intelligent Recommendation */}
+        <div className="mt-8">
+          <IntelligentRecommendation 
+            storeTotals={storeTotals}
+            shoppingType={shoppingType}
           />
         </div>
       </div>

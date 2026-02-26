@@ -1,4 +1,3 @@
-
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import PickupMap from "@/components/PickupMap"; // NEW
+import { Switch } from "@/components/ui/switch";
+import PickupMap from "@/components/PickupMap";
+import { supabase } from "@/integrations/supabase/client";
+import StoreHoursAlert, { validateStoreHours } from "@/components/StoreHoursAlert";
+import { getDistance } from "@/utils/geo";
+import { Loader2 } from "lucide-react";
+import { Database } from "@/integrations/supabase/types";
+import { StoreRecommendation } from "@/components/StoreRecommendation";
 
 type ShoppingType = 'pickup' | 'delivery' | 'instore';
 
@@ -22,6 +28,9 @@ interface LocationState {
   fromOrderSummary?: boolean;
 }
 
+type StoreLocation = Database['public']['Tables']['store_locations']['Row'];
+type StoreWithDistance = StoreLocation & { distance: number; logo_url?: string };
+
 export default function CheckoutDetails() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -34,86 +43,260 @@ export default function CheckoutDetails() {
 
   // Form fields - pre-populate if coming from order summary
   const [deliveryAddress, setDeliveryAddress] = useState(state?.deliveryAddress || "");
-  const [storeStreet, setStoreStreet] = useState("");
-  const [storeCity, setStoreCity] = useState("");
-  const [storeState, setStoreState] = useState("");
-  const [storeZip, setStoreZip] = useState("");
+  
+  // Route optimization toggle
+  const [routeOptimization, setRouteOptimization] = useState(false);
+  
+  // Single address fields (when route optimization is off)
+  const [singleStreet, setSingleStreet] = useState("");
+  const [singleCity, setSingleCity] = useState("");
+  const [singleState, setSingleState] = useState("");
+  const [singleZip, setSingleZip] = useState("");
+  
+  // Work address fields
+  const [workStreet, setWorkStreet] = useState("");
+  const [workCity, setWorkCity] = useState("");
+  const [workState, setWorkState] = useState("");
+  const [workZip, setWorkZip] = useState("");
+  
+  // Home address fields
+  const [homeStreet, setHomeStreet] = useState("");
+  const [homeCity, setHomeCity] = useState("");
+  const [homeState, setHomeState] = useState("");
+  const [homeZip, setHomeZip] = useState("");
+  
   const [pickupTime, setPickupTime] = useState(state?.pickupTime || "");
   const [notes, setNotes] = useState("");
 
   // Map geocoding and geolocation
-  const [userLoc, setUserLoc] = useState<[number, number] | null>(null);
+  const [workLoc, setWorkLoc] = useState<[number, number] | null>(null);
+  const [homeLoc, setHomeLoc] = useState<[number, number] | null>(null);
+  const [singleLoc, setSingleLoc] = useState<[number, number] | null>(null);
   const [storeLoc, setStoreLoc] = useState<[number, number] | null>(null);
+  const [actualStoreName, setActualStoreName] = useState<string>(cheapestStore);
 
-  // Parse existing store address if coming from order summary
-  useEffect(() => {
-    if (fromOrderSummary && state?.storeAddress) {
-      const addressParts = state.storeAddress.split(', ');
-      if (addressParts.length >= 3) {
-        setStoreStreet(addressParts[0]);
-        setStoreCity(addressParts[1]);
-        const stateZip = addressParts[2].split(' ');
-        if (stateZip.length >= 2) {
-          setStoreState(stateZip[0]);
-          setStoreZip(stateZip[1]);
-        }
-      }
-    }
-  }, [fromOrderSummary, state?.storeAddress]);
+<<<<<<< HEAD
+=======
+  // New state for nearby stores
+  const [isFetchingStores, setIsFetchingStores] = useState(false);
+  const [nearbyStores, setNearbyStores] = useState<StoreWithDistance[]>([]);
+  const [selectedStore, setSelectedStore] = useState<StoreWithDistance | null>(null);
+  const [showAllStores, setShowAllStores] = useState(false);
+  const [isChoosingAlternateStore, setIsChoosingAlternateStore] = useState(false);
 
-  // Geolocate user for map on mount
+>>>>>>> feature/vaidic-ui-fixes
+  // Geocode single address (when route optimization is off)
   useEffect(() => {
-    if (shoppingType === "pickup" || shoppingType === "instore") {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          pos => setUserLoc([pos.coords.latitude, pos.coords.longitude]),
-          () => setUserLoc([30.2672, -97.7431]) // fallback: Austin, TX
-        );
-      } else {
-        setUserLoc([30.2672, -97.7431]);
-      }
-    }
-  }, [shoppingType]);
-
-  // Geocode store address (using simple fetch to Nominatim)
-  useEffect(() => {
-    async function geocodeAddress() {
+    async function geocodeSingleAddress() {
       if (shoppingType === "pickup" || shoppingType === "instore") {
-        const address = `${storeStreet}, ${storeCity}, ${storeState} ${storeZip}`;
-        if (storeStreet && storeCity && storeState && storeZip) {
+        const address = `${singleStreet}, ${singleCity}, ${singleState} ${singleZip}`;
+        if (singleStreet && singleCity && singleState && singleZip) {
           try {
             const res = await fetch(
               `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
             );
             const results = await res.json();
             if (Array.isArray(results) && results.length > 0) {
-              setStoreLoc([parseFloat(results[0].lat), parseFloat(results[0].lon)]);
+              setSingleLoc([parseFloat(results[0].lat), parseFloat(results[0].lon)]);
             }
           } catch {
-            setStoreLoc(null);
+            setSingleLoc(null);
           }
         } else {
-          setStoreLoc(null);
+          setSingleLoc(null);
         }
       }
     }
-    geocodeAddress();
-    // Only rerun if address changes and only for pickup/instore types
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeStreet, storeCity, storeState, storeZip, shoppingType]);
+    geocodeSingleAddress();
+  }, [singleStreet, singleCity, singleState, singleZip, shoppingType]);
+
+  // Geocode work address
+  useEffect(() => {
+    async function geocodeWorkAddress() {
+      if (shoppingType === "pickup" || shoppingType === "instore") {
+        const address = `${workStreet}, ${workCity}, ${workState} ${workZip}`;
+        if (workStreet && workCity && workState && workZip) {
+          try {
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
+            );
+            const results = await res.json();
+            if (Array.isArray(results) && results.length > 0) {
+              setWorkLoc([parseFloat(results[0].lat), parseFloat(results[0].lon)]);
+            }
+          } catch {
+            setWorkLoc(null);
+          }
+        } else {
+          setWorkLoc(null);
+        }
+      }
+    }
+    geocodeWorkAddress();
+  }, [workStreet, workCity, workState, workZip, shoppingType]);
+
+  // Geocode home address
+  useEffect(() => {
+    async function geocodeHomeAddress() {
+      if (shoppingType === "pickup" || shoppingType === "instore") {
+        const address = `${homeStreet}, ${homeCity}, ${homeState} ${homeZip}`;
+        if (homeStreet && homeCity && homeState && homeZip) {
+          try {
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
+            );
+            const results = await res.json();
+            if (Array.isArray(results) && results.length > 0) {
+              setHomeLoc([parseFloat(results[0].lat), parseFloat(results[0].lon)]);
+            }
+          } catch {
+            setHomeLoc(null);
+          }
+        } else {
+          setHomeLoc(null);
+        }
+      }
+    }
+    geocodeHomeAddress();
+  }, [homeStreet, homeCity, homeState, homeZip, shoppingType]);
+
+  // Fetch closest recommended store location using Google Places API via Edge Function
+  useEffect(() => {
+    const userLoc = routeOptimization ? workLoc : singleLoc;
+
+    async function fetchRecommendedStore() {
+      if ((shoppingType === "pickup" || shoppingType === "instore") && userLoc) {
+        setStoreLoc(null); // Reset store location
+        setSelectedStore(null);
+        setNearbyStores([]);
+        setShowAllStores(false); // Reset on new search
+        setIsChoosingAlternateStore(false); // Reset on new search
+        setIsFetchingStores(true);
+
+        try {
+          console.log(`Searching for nearby stores for: ${cheapestStore} near ${userLoc}`);
+
+          const { data, error } = await supabase.functions.invoke('find-nearby-stores', {
+            body: {
+              lat: userLoc[0],
+              lng: userLoc[1],
+              keyword: cheapestStore
+            },
+          });
+
+          if (error) {
+            console.error('Error invoking find-nearby-stores function:', error);
+            return;
+          }
+
+          if (data && data.stores && data.stores.length > 0) {
+            // Fetch store logos to match with locations
+            const { data: storesWithLogos } = await supabase
+              .from('stores')
+              .select('name, logo_url');
+
+            const logoMap = new Map<string, string | null>();
+            if (storesWithLogos) {
+              for (const s of storesWithLogos) {
+                if (s.name && s.logo_url) {
+                  logoMap.set(s.name, s.logo_url);
+                }
+              }
+            }
+
+            const userLat = userLoc[0];
+            const userLon = userLoc[1];
+
+            const storesWithDistance = data.stores
+              .map((store: StoreLocation) => {
+                if (store.latitude && store.longitude) {
+                  const distance = getDistance(userLat, userLon, store.latitude, store.longitude);
+                  const logo_url = logoMap.get(store.chain) || undefined;
+                  return { ...store, distance, logo_url };
+                }
+                return null;
+              })
+              .filter((s): s is StoreWithDistance => s !== null);
+
+            // De-duplicate stores based on address to avoid showing same location twice
+            const uniqueStoresMap = new Map<string, StoreWithDistance>();
+            storesWithDistance.forEach(store => {
+              if (store.address_line1 && !uniqueStoresMap.has(store.address_line1)) {
+                uniqueStoresMap.set(store.address_line1, store);
+              }
+            });
+            const uniqueStores = Array.from(uniqueStoresMap.values());
+            uniqueStores.sort((a, b) => a.distance - b.distance);
+            
+            setNearbyStores(uniqueStores);
+            console.log(`Found ${uniqueStores.length} unique nearby stores via Google.`);
+
+            // Auto-select the closest store if one isn't already selected
+            if (uniqueStores.length > 0) {
+              handleSelectStore(uniqueStores[0], false); // Auto-select without hiding picker
+            }
+          } else {
+            console.warn(`No stores found for chain: ${cheapestStore}.`);
+          }
+        } catch (error) {
+          console.error('Error in fetchRecommendedStore:', error);
+        } finally {
+          setIsFetchingStores(false);
+        }
+      }
+    }
+    fetchRecommendedStore();
+  }, [shoppingType, cheapestStore, workLoc, singleLoc, routeOptimization]);
+
+  const handleSelectStore = (store: StoreWithDistance, hidePicker = true) => {
+    setSelectedStore(store);
+    if (store.latitude && store.longitude) {
+      setStoreLoc([store.latitude, store.longitude]);
+      setActualStoreName(store.name);
+    }
+    if (hidePicker) {
+      setIsChoosingAlternateStore(false);
+    }
+  };
+
+  const storeHoursValidation = validateStoreHours(actualStoreName, pickupTime);
 
   const canProceed = shoppingType === "delivery"
     ? !!deliveryAddress
-    : !!(storeStreet && storeCity && storeState && storeZip && pickupTime);
+    : routeOptimization 
+      ? !!(workStreet && workCity && workState && workZip && 
+           homeStreet && homeCity && homeState && homeZip && pickupTime &&
+<<<<<<< HEAD
+           storeHoursValidation.canProceed)
+      : !!(singleStreet && singleCity && singleState && singleZip && pickupTime && storeHoursValidation.canProceed);
+=======
+           storeHoursValidation.canProceed && selectedStore)
+      : !!(singleStreet && singleCity && singleState && singleZip && pickupTime && storeHoursValidation.canProceed && selectedStore);
+>>>>>>> feature/vaidic-ui-fixes
 
   const handlePlaceOrder = () => {
-    const storeAddress = `${storeStreet}, ${storeCity}, ${storeState} ${storeZip}`;
+    const workAddress = `${workStreet}, ${workCity}, ${workState} ${workZip}`;
+    const homeAddress = `${homeStreet}, ${homeCity}, ${homeState} ${homeZip}`;
+    const singleAddress = `${singleStreet}, ${singleCity}, ${singleState} ${singleZip}`;
     
+    const storeFullAddress = selectedStore
+      ? `${selectedStore.address_line1}, ${selectedStore.city}, ${selectedStore.state} ${selectedStore.zip_code}`
+      : undefined;
+
     navigate("/order-summary", {
       state: {
         shoppingType,
+<<<<<<< HEAD
         storeName: cheapestStore,
-        storeAddress: shoppingType === "delivery" ? undefined : storeAddress,
+        workAddress: shoppingType === "delivery" ? undefined : (routeOptimization ? workAddress : undefined),
+        homeAddress: shoppingType === "delivery" ? undefined : (routeOptimization ? homeAddress : undefined),
+        storeAddress: shoppingType === "delivery" ? undefined : (!routeOptimization ? singleAddress : undefined),
+=======
+        storeName: actualStoreName,
+        workAddress: shoppingType === "delivery" ? undefined : (routeOptimization ? workAddress : undefined),
+        homeAddress: shoppingType === "delivery" ? undefined : (routeOptimization ? homeAddress : undefined),
+        storeAddress: storeFullAddress,
+>>>>>>> feature/vaidic-ui-fixes
         deliveryAddress: shoppingType === "delivery" ? deliveryAddress : undefined,
         pickupTime,
         orderTotal,
@@ -121,26 +304,6 @@ export default function CheckoutDetails() {
       }
     });
   };
-
-  // If coming from order summary and all details are already filled, skip to order summary
-  if (fromOrderSummary && canProceed) {
-    const storeAddress = `${storeStreet}, ${storeCity}, ${storeState} ${storeZip}`;
-    
-    navigate("/order-summary", {
-      state: {
-        shoppingType,
-        storeName: cheapestStore,
-        storeAddress: shoppingType === "delivery" ? undefined : storeAddress,
-        deliveryAddress: shoppingType === "delivery" ? deliveryAddress : undefined,
-        pickupTime,
-        orderTotal,
-        itemCount
-      },
-      replace: true
-    });
-    
-    return <div className="p-10 text-center text-gray-700">Loading…</div>;
-  }
 
   return (
     <div className="min-h-screen py-8 bg-gray-50 flex flex-col items-center">
@@ -150,7 +313,7 @@ export default function CheckoutDetails() {
             {shoppingType === "delivery"
               ? "Delivery Details"
               : shoppingType === "pickup"
-              ? "Store Pickup Details"
+              ? "Curbside Pick-Up Details"
               : "In-Store Shopping Details"}
           </CardTitle>
         </CardHeader>
@@ -164,64 +327,268 @@ export default function CheckoutDetails() {
                 value={deliveryAddress}
                 onChange={e => setDeliveryAddress(e.target.value)}
               />
-              <Label htmlFor="delivery-notes">Delivery Notes (optional)</Label>
-              <Textarea
-                id="delivery-notes"
-                placeholder="Gate code, dropoff instructions, etc."
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-              />
+              <div className="pt-4">
+                <Label htmlFor="delivery-notes">Delivery Notes (optional)</Label>
+                <Textarea
+                  id="delivery-notes"
+                  placeholder="Gate code, dropoff instructions, etc."
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                />
+              </div>
             </>
           ) : (
             <>
-              <Label htmlFor="store-street">Store Address</Label>
-              <div className="grid grid-cols-1 gap-4">
-                <Input
-                  id="store-street"
-                  placeholder="Street Address"
-                  value={storeStreet}
-                  onChange={e => setStoreStreet(e.target.value)}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input
-                    placeholder="City"
-                    value={storeCity}
-                    onChange={e => setStoreCity(e.target.value)}
-                  />
-                  <Input
-                    placeholder="State"
-                    value={storeState}
-                    onChange={e => setStoreState(e.target.value)}
+              {/* Route Optimization Toggle */}
+              <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="route-optimization" className="text-blue-800 font-medium">
+                      Route Optimization
+                    </Label>
+                    <p className="text-sm text-blue-600">
+                      Integrate shopping into your daily life by optimizing your route
+                    </p>
+                  </div>
+                  <Switch
+                    id="route-optimization"
+                    checked={routeOptimization}
+                    onCheckedChange={setRouteOptimization}
                   />
                 </div>
+              </div>
+
+              {!routeOptimization ? (
+                /* Single Address Fields */
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="single-street">Your Address</Label>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    <Input
+                      id="single-street"
+                      placeholder="Street Address"
+                      value={singleStreet}
+                      onChange={e => setSingleStreet(e.target.value)}
+                    />
+                    <Input
+                      placeholder="City"
+                      value={singleCity}
+                      onChange={e => setSingleCity(e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        placeholder="ZIP Code"
+                        value={singleZip}
+                        onChange={e => setSingleZip(e.target.value)}
+                      />
+                      <Input
+                        placeholder="State"
+                        value={singleState}
+                        onChange={e => setSingleState(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Starting Location Section */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="work-street">Starting Location</Label>
+                      <p className="text-sm text-gray-600 mb-2">Enter your starting point (e.g., work, university, gym) for route optimization</p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4">
+                      <Input
+                        id="work-street"
+                        placeholder="Starting Location Street Address"
+                        value={workStreet}
+                        onChange={e => setWorkStreet(e.target.value)}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input
+                          placeholder="City"
+                          value={workCity}
+                          onChange={e => setWorkCity(e.target.value)}
+                        />
+                        <Input
+                          placeholder="State"
+                          value={workState}
+                          onChange={e => setWorkState(e.target.value)}
+                        />
+                      </div>
+                      <Input
+                        placeholder="ZIP Code"
+                        value={workZip}
+                        onChange={e => setWorkZip(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Home Address Section */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="home-street">Destination (Home)</Label>
+                      <p className="text-sm text-gray-600 mb-2">Enter your home location for route optimization</p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4">
+                      <Input
+                        id="home-street"
+                        placeholder="Home Street Address"
+                        value={homeStreet}
+                        onChange={e => setHomeStreet(e.target.value)}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input
+                          placeholder="City"
+                          value={homeCity}
+                          onChange={e => setHomeCity(e.target.value)}
+                        />
+                        <Input
+                          placeholder="State"
+                          value={homeState}
+                          onChange={e => setHomeState(e.target.value)}
+                        />
+                      </div>
+                      <Input
+                        placeholder="ZIP Code"
+                        value={homeZip}
+                        onChange={e => setHomeZip(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+<<<<<<< HEAD
+=======
+              
+              {/* Nearby Stores Selection */}
+              {(singleLoc || workLoc) && (
+                <div className="space-y-4 pt-4">
+                  <Label>Select a Store</Label>
+                  {isFetchingStores ? (
+                    <div className="flex items-center space-x-2 text-gray-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Finding nearby stores...</span>
+                    </div>
+                  ) : nearbyStores.length > 0 && selectedStore ? (
+                    <div className="space-y-4">
+                      <StoreRecommendation
+                        store={selectedStore}
+                        onClick={() => handleSelectStore(selectedStore)}
+                        onModify={() => {
+                          if (isChoosingAlternateStore) {
+                            // If the picker is open, close it.
+                            setIsChoosingAlternateStore(false);
+                          } else {
+                            // If the picker is closed, open it and reset the 'show all' view.
+                            setShowAllStores(false);
+                            setIsChoosingAlternateStore(true);
+                          }
+                        }}
+                        otherStoresCount={nearbyStores.length - 1}
+                      />
+
+                      {isChoosingAlternateStore && (
+                        <div className="animate-fade-in space-y-2 pt-4">
+                          <h4 className="font-medium text-gray-800">Other nearby locations</h4>
+                          {(showAllStores 
+                            ? nearbyStores.filter(s => s.id !== selectedStore.id) 
+                            : nearbyStores.filter(s => s.id !== selectedStore.id).slice(0, 2)
+                          ).map(store => (
+                            <div
+                              key={store.id}
+                              onClick={() => handleSelectStore(store)}
+                              className="p-3 border rounded-lg cursor-pointer transition-colors border-gray-200 hover:border-gray-300"
+                            >
+                              <div className="font-semibold">{store.name}</div>
+                              <div className="text-sm text-gray-500">{store.address_line1}{store.city ? `, ${store.city}` : ''}</div>
+                              <div className="text-sm font-medium text-primary">{store.distance.toFixed(1)} miles away</div>
+                            </div>
+                          ))}
+                          
+                          {/* Logic for "Show more" button for alternate stores */}
+                          {nearbyStores.filter(s => s.id !== selectedStore.id).length > 2 && !showAllStores && (
+                            <Button 
+                              variant="link" 
+                              className="p-0 h-auto text-blue-600" 
+                              onClick={() => setShowAllStores(true)}
+                            >
+                              Show {nearbyStores.filter(s => s.id !== selectedStore.id).length - 2} more stores...
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No stores found for {cheapestStore} near the provided address. Please try a different address.</p>
+                  )}
+                </div>
+              )}
+>>>>>>> feature/vaidic-ui-fixes
+              
+              <div className="pt-4">
+                <Label htmlFor="pickup-time">
+                  {shoppingType === "pickup" ? "Pick-up Time" : "Pickup Time"}
+                </Label>
                 <Input
-                  placeholder="ZIP Code"
-                  value={storeZip}
-                  onChange={e => setStoreZip(e.target.value)}
+                  id="pickup-time"
+                  type="time"
+                  value={pickupTime}
+                  onChange={e => setPickupTime(e.target.value)}
                 />
               </div>
               
-              <Label htmlFor="pickup-time" className="pt-2">Pickup Time</Label>
-              <Input
-                id="pickup-time"
-                type="time"
-                value={pickupTime}
-                onChange={e => setPickupTime(e.target.value)}
-              />
-              <Label htmlFor="pickup-notes">Pickup Notes (optional)</Label>
-              <Textarea
-                id="pickup-notes"
-                placeholder="Anything to help the store staff?"
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-              />
-              {/* Cute pickup map below notes */}
-              <div>
-                <PickupMap start={userLoc} dest={storeLoc} />
-                <p className="text-xs text-gray-400 text-center mt-1">
-                  <span role="img" aria-label="info">🗺️</span> Fun overview: your starting point and store!
-                </p>
+              {pickupTime && selectedStore && (
+                <StoreHoursAlert 
+                  storeName={actualStoreName} 
+                  pickupTime={pickupTime} 
+                />
+              )}
+              
+              <div className="pt-4">
+                <Label htmlFor="pickup-notes">
+                  {shoppingType === "pickup" ? "Pick-up Notes (optional)" : "Pickup Notes (optional)"}
+                </Label>
+                <Textarea
+                  id="pickup-notes"
+                  placeholder="Anything to help the store staff?"
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                />
               </div>
+              
+              {/* Map - show for both route optimization modes */}
+              {((routeOptimization && workLoc && homeLoc && storeLoc) || 
+<<<<<<< HEAD
+                (!routeOptimization && singleLoc && storeLoc)) && (
+=======
+                (!routeOptimization && singleLoc && storeLoc)) && selectedStore && (
+>>>>>>> feature/vaidic-ui-fixes
+                <div>
+                  <PickupMap 
+                    start={routeOptimization ? workLoc : singleLoc} 
+                    dest={routeOptimization ? homeLoc : singleLoc} 
+                    storeLocation={storeLoc}
+                    storeName={actualStoreName}
+<<<<<<< HEAD
+                  />
+                  <p className="text-xs text-gray-400 text-center mt-1">
+                    <span role="img" aria-label="info">🗺️</span> {routeOptimization 
+                      ? `Optimized route: Starting Location → ${actualStoreName} (recommended store) → Home`
+                      : `Route: Your Location → ${actualStoreName} (recommended store) → Your Location`
+=======
+                    storeLogoUrl={selectedStore?.logo_url}
+                  />
+                  <p className="text-xs text-gray-400 text-center mt-1">
+                    <span role="img" aria-label="info">🗺️</span> {routeOptimization 
+                      ? `Optimized route: Starting Location → ${actualStoreName} → Home`
+                      : `Route: Your Location → ${actualStoreName} → Your Location`
+>>>>>>> feature/vaidic-ui-fixes
+                    }
+                  </p>
+                </div>
+              )}
             </>
           )}
 

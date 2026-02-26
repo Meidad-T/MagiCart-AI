@@ -134,6 +134,63 @@ export type Database = {
         }
         Relationships: []
       }
+      shopping_plans: {
+        Row: {
+          created_at: string
+          custom_frequency_days: number | null
+          delivery_address: string | null
+          estimated_total: number
+          frequency: string
+          id: string
+          is_active: boolean
+          item_count: number
+          items: Json
+          name: string
+          pickup_time: string | null
+          shopping_type: string
+          store_address: string | null
+          store_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_frequency_days?: number | null
+          delivery_address?: string | null
+          estimated_total?: number
+          frequency: string
+          id?: string
+          is_active?: boolean
+          item_count?: number
+          items?: Json
+          name: string
+          pickup_time?: string | null
+          shopping_type: string
+          store_address?: string | null
+          store_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_frequency_days?: number | null
+          delivery_address?: string | null
+          estimated_total?: number
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          item_count?: number
+          items?: Json
+          name?: string
+          pickup_time?: string | null
+          shopping_type?: string
+          store_address?: string | null
+          store_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       shopping_sessions: {
         Row: {
           created_at: string
@@ -164,23 +221,92 @@ export type Database = {
         }
         Relationships: []
       }
+      store_locations: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          chain: string
+          city: string | null
+          county: string | null
+          created_at: string | null
+          departments: Json | null
+          division_number: string | null
+          geolocation: unknown | null
+          hours: Json | null
+          id: string
+          latitude: number | null
+          location_id: string | null
+          longitude: number | null
+          name: string
+          phone: string | null
+          state: string | null
+          store_number: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          chain: string
+          city?: string | null
+          county?: string | null
+          created_at?: string | null
+          departments?: Json | null
+          division_number?: string | null
+          geolocation?: unknown | null
+          hours?: Json | null
+          id?: string
+          latitude?: number | null
+          location_id?: string | null
+          longitude?: number | null
+          name: string
+          phone?: string | null
+          state?: string | null
+          store_number?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          chain?: string
+          city?: string | null
+          county?: string | null
+          created_at?: string | null
+          departments?: Json | null
+          division_number?: string | null
+          geolocation?: unknown | null
+          hours?: Json | null
+          id?: string
+          latitude?: number | null
+          location_id?: string | null
+          longitude?: number | null
+          name?: string
+          phone?: string | null
+          state?: string | null
+          store_number?: string | null
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
       stores: {
         Row: {
           created_at: string
           display_name: string
           id: string
+          logo_url: string | null
           name: string
         }
         Insert: {
           created_at?: string
           display_name: string
           id?: string
+          logo_url?: string | null
           name: string
         }
         Update: {
           created_at?: string
           display_name?: string
           id?: string
+          logo_url?: string | null
           name?: string
         }
         Relationships: []
