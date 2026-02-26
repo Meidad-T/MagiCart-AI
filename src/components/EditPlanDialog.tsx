@@ -1,14 +1,27 @@
+<<<<<<< HEAD
 import { useState } from "react";
+=======
+import { useState, useEffect } from "react";
+>>>>>>> feature/vaidic-ui-fixes
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+<<<<<<< HEAD
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useShoppingPlans } from "@/hooks/useShoppingPlans";
 import type { ShoppingPlan } from "@/types/database";
+=======
+import { Minus, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { useShoppingPlans } from "@/hooks/useShoppingPlans";
+import type { ShoppingPlan } from "@/types/database";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useProducts } from "@/hooks/useProducts";
+>>>>>>> feature/vaidic-ui-fixes
 
 interface EditPlanDialogProps {
   plan: ShoppingPlan;
@@ -27,6 +40,7 @@ interface PlanItemInDialog {
 
 export default function EditPlanDialog({ plan, open, onOpenChange }: EditPlanDialogProps) {
   const { updatePlan } = useShoppingPlans();
+<<<<<<< HEAD
   const [planName, setPlanName] = useState(plan.name);
   const [frequency, setFrequency] = useState<'none' | 'monthly' | 'weekly' | 'bi-weekly' | 'custom'>(plan.frequency);
   const [customDays, setCustomDays] = useState<string>(String(plan.custom_frequency_days || 30));
@@ -47,6 +61,39 @@ export default function EditPlanDialog({ plan, open, onOpenChange }: EditPlanDia
     // If no items, return an empty array.
     return [];
   });
+=======
+  const { data: products } = useProducts();
+  const [planName, setPlanName] = useState("");
+  const [frequency, setFrequency] = useState<'none' | 'monthly' | 'weekly' | 'bi-weekly' | 'custom'>('none');
+  const [customDays, setCustomDays] = useState<string>('30');
+  const [loading, setLoading] = useState(false);
+  const [planItems, setPlanItems] = useState<PlanItemInDialog[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (plan && products && products.length > 0) {
+      setPlanName(plan.name);
+      setFrequency(plan.frequency);
+      setCustomDays(String(plan.custom_frequency_days || 30));
+
+      if (Array.isArray(plan.items)) {
+        const itemsWithPrices = plan.items.map((item: any) => {
+          const fullProductInfo = products.find(p => p.id === item.id);
+          const storePrice = fullProductInfo?.prices?.[plan.store_name] ?? 0;
+          return {
+            ...item,
+            name: fullProductInfo?.name || item.name,
+            image_url: fullProductInfo?.image_url,
+            price: storePrice,
+          };
+        });
+        setPlanItems(itemsWithPrices);
+      } else {
+        setPlanItems([]);
+      }
+    }
+  }, [plan, products]);
+>>>>>>> feature/vaidic-ui-fixes
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -115,6 +162,60 @@ export default function EditPlanDialog({ plan, open, onOpenChange }: EditPlanDia
     }
   };
 
+<<<<<<< HEAD
+=======
+  const renderItemCard = (item: PlanItemInDialog) => (
+    <Card key={item.id}>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-4">
+          {item.image_url && (
+            <img
+              src={item.image_url}
+              alt={item.name}
+              className="w-12 h-12 object-cover rounded"
+              onError={(e) => {
+                e.currentTarget.src = '/placeholder.svg';
+              }}
+            />
+          )}
+          
+          <div className="flex-1">
+            <h4 className="font-medium">{item.name}</h4>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            
+            <span className="w-12 text-center">{item.quantity}</span>
+            
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+            
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => removeItem(item.id)}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+>>>>>>> feature/vaidic-ui-fixes
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -139,6 +240,7 @@ export default function EditPlanDialog({ plan, open, onOpenChange }: EditPlanDia
           <div>
             <Label className="text-base font-medium">Items in Plan</Label>
             <div className="space-y-3 mt-2">
+<<<<<<< HEAD
               {planItems.map((item) => (
                 <Card key={item.id}>
                   <CardContent className="p-4">
@@ -194,16 +296,38 @@ export default function EditPlanDialog({ plan, open, onOpenChange }: EditPlanDia
                   </CardContent>
                 </Card>
               ))}
+=======
+              {planItems.slice(0, 3).map(renderItemCard)}
+
+              {planItems.length > 3 && (
+                <Collapsible open={isExpanded} onOpenChange={setIsExpanded} className="w-full">
+                  <CollapsibleContent className="space-y-3">
+                    {planItems.slice(3).map(renderItemCard)}
+                  </CollapsibleContent>
+                  <div className="flex justify-center mt-2">
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="w-full text-sm flex items-center">
+                        {isExpanded ? "Show Less" : `Show ${planItems.length - 3} More Items`}
+                        {isExpanded ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
+                      </Button>
+                    </CollapsibleTrigger>
+                  </div>
+                </Collapsible>
+              )}
+>>>>>>> feature/vaidic-ui-fixes
               
               {planItems.length === 0 && (
                 <p className="text-gray-500 text-center py-4">No items in this plan.</p>
               )}
+<<<<<<< HEAD
               
               {planItems.length > 0 && (
                 <div className="text-right pt-4 border-t">
                   <p className="text-lg font-bold">Total: ${calculateTotal().toFixed(2)}</p>
                 </div>
               )}
+=======
+>>>>>>> feature/vaidic-ui-fixes
             </div>
           </div>
 

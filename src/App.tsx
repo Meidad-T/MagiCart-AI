@@ -35,7 +35,11 @@ const App = () => {
             <Route path="/cart" element={<Cart cart={cart} onUpdateCart={updateCart} />} />
             <Route path="/health-recommendations" element={<HealthRecommendations cart={cart} onUpdateCart={updateCart} />} />
             <Route path="/checkout-details" element={<CheckoutDetails />} />
+<<<<<<< HEAD
             <Route path="/order-summary" element={<OrderSummary />} />
+=======
+            <Route path="/order-summary" element={<OrderSummary cart={cart} />} />
+>>>>>>> feature/vaidic-ui-fixes
             <Route path="/shopping-plans" element={<ShoppingPlans cart={cart} onUpdateCart={updateCart} />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<NotFound />} />

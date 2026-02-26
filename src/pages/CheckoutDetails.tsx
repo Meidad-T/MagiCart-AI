@@ -9,6 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import PickupMap from "@/components/PickupMap";
 import { supabase } from "@/integrations/supabase/client";
 import StoreHoursAlert, { validateStoreHours } from "@/components/StoreHoursAlert";
+import { getDistance } from "@/utils/geo";
+import { Loader2 } from "lucide-react";
+import { Database } from "@/integrations/supabase/types";
+import { StoreRecommendation } from "@/components/StoreRecommendation";
 
 type ShoppingType = 'pickup' | 'delivery' | 'instore';
 
@@ -23,6 +27,9 @@ interface LocationState {
   pickupTime?: string;
   fromOrderSummary?: boolean;
 }
+
+type StoreLocation = Database['public']['Tables']['store_locations']['Row'];
+type StoreWithDistance = StoreLocation & { distance: number; logo_url?: string };
 
 export default function CheckoutDetails() {
   const navigate = useNavigate();
@@ -68,6 +75,16 @@ export default function CheckoutDetails() {
   const [storeLoc, setStoreLoc] = useState<[number, number] | null>(null);
   const [actualStoreName, setActualStoreName] = useState<string>(cheapestStore);
 
+<<<<<<< HEAD
+=======
+  // New state for nearby stores
+  const [isFetchingStores, setIsFetchingStores] = useState(false);
+  const [nearbyStores, setNearbyStores] = useState<StoreWithDistance[]>([]);
+  const [selectedStore, setSelectedStore] = useState<StoreWithDistance | null>(null);
+  const [showAllStores, setShowAllStores] = useState(false);
+  const [isChoosingAlternateStore, setIsChoosingAlternateStore] = useState(false);
+
+>>>>>>> feature/vaidic-ui-fixes
   // Geocode single address (when route optimization is off)
   useEffect(() => {
     async function geocodeSingleAddress() {
@@ -143,45 +160,104 @@ export default function CheckoutDetails() {
     geocodeHomeAddress();
   }, [homeStreet, homeCity, homeState, homeZip, shoppingType]);
 
-  // Fetch actual recommended store location from database
+  // Fetch closest recommended store location using Google Places API via Edge Function
   useEffect(() => {
+    const userLoc = routeOptimization ? workLoc : singleLoc;
+
     async function fetchRecommendedStore() {
-      if (shoppingType === "pickup" || shoppingType === "instore") {
+      if ((shoppingType === "pickup" || shoppingType === "instore") && userLoc) {
+        setStoreLoc(null); // Reset store location
+        setSelectedStore(null);
+        setNearbyStores([]);
+        setShowAllStores(false); // Reset on new search
+        setIsChoosingAlternateStore(false); // Reset on new search
+        setIsFetchingStores(true);
+
         try {
-          // Get store location from database based on the recommended store name
-          const { data: storeData, error } = await supabase
-            .from('store_locations')
-            .select('latitude, longitude, name, address_line1, city, state')
-            .ilike('name', `%${cheapestStore}%`)
-            .not('latitude', 'is', null)
-            .not('longitude', 'is', null)
-            .limit(1)
-            .single();
+          console.log(`Searching for nearby stores for: ${cheapestStore} near ${userLoc}`);
+
+          const { data, error } = await supabase.functions.invoke('find-nearby-stores', {
+            body: {
+              lat: userLoc[0],
+              lng: userLoc[1],
+              keyword: cheapestStore
+            },
+          });
 
           if (error) {
-            console.error('Error fetching store location:', error);
-            // Fallback to Austin central location if store not found
-            setStoreLoc([30.2672, -97.7431]);
+            console.error('Error invoking find-nearby-stores function:', error);
             return;
           }
 
-          if (storeData && storeData.latitude && storeData.longitude) {
-            setStoreLoc([storeData.latitude, storeData.longitude]);
-            setActualStoreName(storeData.name);
-            console.log('Found recommended store:', storeData.name, 'at', [storeData.latitude, storeData.longitude]);
+          if (data && data.stores && data.stores.length > 0) {
+            // Fetch store logos to match with locations
+            const { data: storesWithLogos } = await supabase
+              .from('stores')
+              .select('name, logo_url');
+
+            const logoMap = new Map<string, string | null>();
+            if (storesWithLogos) {
+              for (const s of storesWithLogos) {
+                if (s.name && s.logo_url) {
+                  logoMap.set(s.name, s.logo_url);
+                }
+              }
+            }
+
+            const userLat = userLoc[0];
+            const userLon = userLoc[1];
+
+            const storesWithDistance = data.stores
+              .map((store: StoreLocation) => {
+                if (store.latitude && store.longitude) {
+                  const distance = getDistance(userLat, userLon, store.latitude, store.longitude);
+                  const logo_url = logoMap.get(store.chain) || undefined;
+                  return { ...store, distance, logo_url };
+                }
+                return null;
+              })
+              .filter((s): s is StoreWithDistance => s !== null);
+
+            // De-duplicate stores based on address to avoid showing same location twice
+            const uniqueStoresMap = new Map<string, StoreWithDistance>();
+            storesWithDistance.forEach(store => {
+              if (store.address_line1 && !uniqueStoresMap.has(store.address_line1)) {
+                uniqueStoresMap.set(store.address_line1, store);
+              }
+            });
+            const uniqueStores = Array.from(uniqueStoresMap.values());
+            uniqueStores.sort((a, b) => a.distance - b.distance);
+            
+            setNearbyStores(uniqueStores);
+            console.log(`Found ${uniqueStores.length} unique nearby stores via Google.`);
+
+            // Auto-select the closest store if one isn't already selected
+            if (uniqueStores.length > 0) {
+              handleSelectStore(uniqueStores[0], false); // Auto-select without hiding picker
+            }
           } else {
-            // Fallback to Austin central location
-            setStoreLoc([30.2672, -97.7431]);
+            console.warn(`No stores found for chain: ${cheapestStore}.`);
           }
         } catch (error) {
           console.error('Error in fetchRecommendedStore:', error);
-          // Fallback to Austin central location
-          setStoreLoc([30.2672, -97.7431]);
+        } finally {
+          setIsFetchingStores(false);
         }
       }
     }
     fetchRecommendedStore();
-  }, [shoppingType, cheapestStore]);
+  }, [shoppingType, cheapestStore, workLoc, singleLoc, routeOptimization]);
+
+  const handleSelectStore = (store: StoreWithDistance, hidePicker = true) => {
+    setSelectedStore(store);
+    if (store.latitude && store.longitude) {
+      setStoreLoc([store.latitude, store.longitude]);
+      setActualStoreName(store.name);
+    }
+    if (hidePicker) {
+      setIsChoosingAlternateStore(false);
+    }
+  };
 
   const storeHoursValidation = validateStoreHours(actualStoreName, pickupTime);
 
@@ -190,21 +266,37 @@ export default function CheckoutDetails() {
     : routeOptimization 
       ? !!(workStreet && workCity && workState && workZip && 
            homeStreet && homeCity && homeState && homeZip && pickupTime &&
+<<<<<<< HEAD
            storeHoursValidation.canProceed)
       : !!(singleStreet && singleCity && singleState && singleZip && pickupTime && storeHoursValidation.canProceed);
+=======
+           storeHoursValidation.canProceed && selectedStore)
+      : !!(singleStreet && singleCity && singleState && singleZip && pickupTime && storeHoursValidation.canProceed && selectedStore);
+>>>>>>> feature/vaidic-ui-fixes
 
   const handlePlaceOrder = () => {
     const workAddress = `${workStreet}, ${workCity}, ${workState} ${workZip}`;
     const homeAddress = `${homeStreet}, ${homeCity}, ${homeState} ${homeZip}`;
     const singleAddress = `${singleStreet}, ${singleCity}, ${singleState} ${singleZip}`;
     
+    const storeFullAddress = selectedStore
+      ? `${selectedStore.address_line1}, ${selectedStore.city}, ${selectedStore.state} ${selectedStore.zip_code}`
+      : undefined;
+
     navigate("/order-summary", {
       state: {
         shoppingType,
+<<<<<<< HEAD
         storeName: cheapestStore,
         workAddress: shoppingType === "delivery" ? undefined : (routeOptimization ? workAddress : undefined),
         homeAddress: shoppingType === "delivery" ? undefined : (routeOptimization ? homeAddress : undefined),
         storeAddress: shoppingType === "delivery" ? undefined : (!routeOptimization ? singleAddress : undefined),
+=======
+        storeName: actualStoreName,
+        workAddress: shoppingType === "delivery" ? undefined : (routeOptimization ? workAddress : undefined),
+        homeAddress: shoppingType === "delivery" ? undefined : (routeOptimization ? homeAddress : undefined),
+        storeAddress: storeFullAddress,
+>>>>>>> feature/vaidic-ui-fixes
         deliveryAddress: shoppingType === "delivery" ? deliveryAddress : undefined,
         pickupTime,
         orderTotal,
@@ -367,6 +459,73 @@ export default function CheckoutDetails() {
                   </div>
                 </>
               )}
+<<<<<<< HEAD
+=======
+              
+              {/* Nearby Stores Selection */}
+              {(singleLoc || workLoc) && (
+                <div className="space-y-4 pt-4">
+                  <Label>Select a Store</Label>
+                  {isFetchingStores ? (
+                    <div className="flex items-center space-x-2 text-gray-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Finding nearby stores...</span>
+                    </div>
+                  ) : nearbyStores.length > 0 && selectedStore ? (
+                    <div className="space-y-4">
+                      <StoreRecommendation
+                        store={selectedStore}
+                        onClick={() => handleSelectStore(selectedStore)}
+                        onModify={() => {
+                          if (isChoosingAlternateStore) {
+                            // If the picker is open, close it.
+                            setIsChoosingAlternateStore(false);
+                          } else {
+                            // If the picker is closed, open it and reset the 'show all' view.
+                            setShowAllStores(false);
+                            setIsChoosingAlternateStore(true);
+                          }
+                        }}
+                        otherStoresCount={nearbyStores.length - 1}
+                      />
+
+                      {isChoosingAlternateStore && (
+                        <div className="animate-fade-in space-y-2 pt-4">
+                          <h4 className="font-medium text-gray-800">Other nearby locations</h4>
+                          {(showAllStores 
+                            ? nearbyStores.filter(s => s.id !== selectedStore.id) 
+                            : nearbyStores.filter(s => s.id !== selectedStore.id).slice(0, 2)
+                          ).map(store => (
+                            <div
+                              key={store.id}
+                              onClick={() => handleSelectStore(store)}
+                              className="p-3 border rounded-lg cursor-pointer transition-colors border-gray-200 hover:border-gray-300"
+                            >
+                              <div className="font-semibold">{store.name}</div>
+                              <div className="text-sm text-gray-500">{store.address_line1}{store.city ? `, ${store.city}` : ''}</div>
+                              <div className="text-sm font-medium text-primary">{store.distance.toFixed(1)} miles away</div>
+                            </div>
+                          ))}
+                          
+                          {/* Logic for "Show more" button for alternate stores */}
+                          {nearbyStores.filter(s => s.id !== selectedStore.id).length > 2 && !showAllStores && (
+                            <Button 
+                              variant="link" 
+                              className="p-0 h-auto text-blue-600" 
+                              onClick={() => setShowAllStores(true)}
+                            >
+                              Show {nearbyStores.filter(s => s.id !== selectedStore.id).length - 2} more stores...
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No stores found for {cheapestStore} near the provided address. Please try a different address.</p>
+                  )}
+                </div>
+              )}
+>>>>>>> feature/vaidic-ui-fixes
               
               <div className="pt-4">
                 <Label htmlFor="pickup-time">
@@ -380,7 +539,7 @@ export default function CheckoutDetails() {
                 />
               </div>
               
-              {pickupTime && (
+              {pickupTime && selectedStore && (
                 <StoreHoursAlert 
                   storeName={actualStoreName} 
                   pickupTime={pickupTime} 
@@ -401,18 +560,31 @@ export default function CheckoutDetails() {
               
               {/* Map - show for both route optimization modes */}
               {((routeOptimization && workLoc && homeLoc && storeLoc) || 
+<<<<<<< HEAD
                 (!routeOptimization && singleLoc && storeLoc)) && (
+=======
+                (!routeOptimization && singleLoc && storeLoc)) && selectedStore && (
+>>>>>>> feature/vaidic-ui-fixes
                 <div>
                   <PickupMap 
                     start={routeOptimization ? workLoc : singleLoc} 
                     dest={routeOptimization ? homeLoc : singleLoc} 
                     storeLocation={storeLoc}
                     storeName={actualStoreName}
+<<<<<<< HEAD
                   />
                   <p className="text-xs text-gray-400 text-center mt-1">
                     <span role="img" aria-label="info">🗺️</span> {routeOptimization 
                       ? `Optimized route: Starting Location → ${actualStoreName} (recommended store) → Home`
                       : `Route: Your Location → ${actualStoreName} (recommended store) → Your Location`
+=======
+                    storeLogoUrl={selectedStore?.logo_url}
+                  />
+                  <p className="text-xs text-gray-400 text-center mt-1">
+                    <span role="img" aria-label="info">🗺️</span> {routeOptimization 
+                      ? `Optimized route: Starting Location → ${actualStoreName} → Home`
+                      : `Route: Your Location → ${actualStoreName} → Your Location`
+>>>>>>> feature/vaidic-ui-fixes
                     }
                   </p>
                 </div>

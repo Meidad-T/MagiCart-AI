@@ -20,6 +20,10 @@ interface LocationState {
   itemCount?: number;
 }
 
+interface OrderSummaryProps {
+  cart: Array<ProductWithPrices & { quantity: number }>;
+}
+
 // Store brand colors
 const storeColors = {
   'H-E-B': '#e31837',
@@ -48,7 +52,11 @@ const fallbackAddresses = {
   'Wegmans': '11066 Pecan Park Blvd, Austin, TX 78750'
 };
 
+<<<<<<< HEAD
 export default function OrderSummary() {
+=======
+export default function OrderSummary({ cart }: OrderSummaryProps) {
+>>>>>>> feature/vaidic-ui-fixes
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -109,6 +117,7 @@ export default function OrderSummary() {
     itemCount,
   };
 
+<<<<<<< HEAD
   // You'll need access to the real cart -- so this file needs to get it, probably from props or context.
   // For this code, accept cart from the App and pass it through.
   // Update the props to pass the cart:
@@ -117,6 +126,9 @@ export default function OrderSummary() {
   // For demo purposes, get cart from window.__REAL_CART__ if not provided (for local testing); otherwise, this should be passed via the parent.
 
   const cart = (window as any).__REAL_CART__ || []; // Replace with your real cart source
+=======
+  // The cart is now passed via props, so the fallback to window.__REAL_CART__ is removed.
+>>>>>>> feature/vaidic-ui-fixes
 
   return (
     <div className="min-h-screen py-8 bg-gray-50 flex flex-col items-center">
